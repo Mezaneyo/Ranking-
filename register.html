@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - School Ranking System</title>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .auth-container { width: 100%; max-width: 440px; }
+        .auth-card {
+            background: white;
+            border-radius: 32px;
+            padding: 48px 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+        .logo { text-align: center; margin-bottom: 32px; }
+        .logo-icon {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+        }
+        .logo-icon span { font-size: 32px; }
+        .logo h1 { font-size: 24px; font-weight: 600; color: #1a1a2e; margin-bottom: 6px; }
+        .logo p { font-size: 14px; color: #6c757d; }
+        .auth-tabs {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 28px;
+            border-bottom: 1px solid #e9ecef;
+            padding-bottom: 12px;
+        }
+        .auth-tab {
+            flex: 1;
+            text-align: center;
+            font-size: 15px;
+            font-weight: 500;
+            color: #adb5bd;
+            cursor: pointer;
+            position: relative;
+        }
+        .auth-tab.active { color: #667eea; }
+        .auth-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .input-group { margin-bottom: 24px; }
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #495057;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 14px 0;
+            background: transparent;
+            border: none;
+            border-bottom: 1.5px solid #e9ecef;
+            font-size: 15px;
+            transition: all 0.2s;
+            outline: none;
+        }
+        .input-group input:focus { border-bottom-color: #667eea; }
+        .input-group input.error { border-bottom-color: #dc3545; }
+        .error-message {
+            color: #dc3545;
+            font-size: 11px;
+            margin-top: 6px;
+            display: none;
+        }
+        .error-message.show { display: block; }
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 40px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .login-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .divider {
+            text-align: center;
+            margin: 24px 0;
+            font-size: 12px;
+            color: #adb5bd;
+            position: relative;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: calc(50% - 60px);
+            height: 1px;
+            background: #e9ecef;
+        }
+        .divider::before { left: 0; }
+        .divider::after { right: 0; }
+        .google-btn {
+            width: 100%;
+            padding: 12px;
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 40px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .google-btn:hover { background: #f8f9fa; }
+        .login-link { text-align: center; margin-top: 28px; }
+        .login-link p { font-size: 13px; color: #6c757d; }
+        .login-link a { color: #667eea; text-decoration: none; font-weight: 600; }
+        .security-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 24px;
+            font-size: 11px;
+            color: #adb5bd;
+        }
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #212529;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-size: 13px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        .toast.show { opacity: 1; }
+        .toast.success { background: #28a745; }
+        .toast.error { background: #dc3545; }
+        @media (max-width: 480px) { .auth-card { padding: 32px 24px; } }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="logo">
+                <div class="logo-icon"><span>🏆</span></div>
+                <h1>Create Account</h1>
+                <p>Join as a teacher to manage rankings</p>
+            </div>
+
+            <div class="auth-tabs">
+                <div class="auth-tab active">Sign Up</div>
+                <div class="auth-tab" onclick="window.location.href='index.html'">Sign In</div>
+            </div>
+
+            <form id="registerForm">
+                <div class="input-group">
+                    <label>Full Name</label>
+                    <input type="text" id="username" placeholder="Juan Dela Cruz">
+                    <div class="error-message" id="nameError"></div>
+                </div>
+                <div class="input-group">
+                    <label>Email Address</label>
+                    <input type="email" id="email" placeholder="teacher@school.com">
+                    <div class="error-message" id="emailError"></div>
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="password" placeholder="Create a strong password">
+                    <div class="error-message" id="passwordError"></div>
+                </div>
+                <div class="input-group">
+                    <label>Confirm Password</label>
+                    <input type="password" id="confirmPassword" placeholder="Confirm your password">
+                    <div class="error-message" id="confirmError"></div>
+                </div>
+                <button type="submit" class="login-btn" id="registerBtn">Create Account →</button>
+            </form>
+
+            <div class="divider">or</div>
+
+            <button class="google-btn" id="googleSignUp">
+                <svg width="18" height="18" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Sign up with Google
+            </button>
+
+            <div class="login-link">
+                <p>Already have an account? <a href="index.html">Sign in</a></p>
+            </div>
+            <div class="security-badge"><span>✓</span> Secured with Firebase Authentication</div>
+        </div>
+    </div>
+    <div id="toast" class="toast"></div>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAKTBTnSHbZ-aEzIOZZ6ElWpybD93DHXVc",
+            authDomain: "school-7bfaa.firebaseapp.com",
+            projectId: "school-7bfaa",
+            storageBucket: "school-7bfaa.firebasestorage.app",
+            messagingSenderId: "91516216765",
+            appId: "1:91516216765:web:d95271f492a680308d1ed4"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // Check if already logged in
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                window.location.href = 'dashboard.html';
+            }
+        });
+
+        // Handle Registration
+        async function handleRegister(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            document.querySelectorAll('.error-message').forEach(el => el.classList.remove('show'));
+            document.querySelectorAll('input').forEach(el => el.classList.remove('error'));
+            
+            let hasError = false;
+            
+            if (!username) {
+                document.getElementById('nameError').textContent = 'Name required';
+                document.getElementById('nameError').classList.add('show');
+                document.getElementById('username').classList.add('error');
+                hasError = true;
+            }
+            
+            if (!email) {
+                document.getElementById('emailError').textContent = 'Email required';
+                document.getElementById('emailError').classList.add('show');
+                document.getElementById('email').classList.add('error');
+                hasError = true;
+            }
+            
+            if (!password) {
+                document.getElementById('passwordError').textContent = 'Password required';
+                document.getElementById('passwordError').classList.add('show');
+                document.getElementById('password').classList.add('error');
+                hasError = true;
+            } else if (password.length < 6) {
+                document.getElementById('passwordError').textContent = 'Password must be at least 6 characters';
+                document.getElementById('passwordError').classList.add('show');
+                document.getElementById('password').classList.add('error');
+                hasError = true;
+            }
+            
+            if (password !== confirmPassword) {
+                document.getElementById('confirmError').textContent = 'Passwords do not match';
+                document.getElementById('confirmError').classList.add('show');
+                document.getElementById('confirmPassword').classList.add('error');
+                hasError = true;
+            }
+            
+            if (hasError) return;
+            
+            const btn = document.getElementById('registerBtn');
+            btn.textContent = 'Creating account...';
+            btn.disabled = true;
+            
+            try {
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                const user = userCredential.user;
+                
+                // Update display name
+                await user.updateProfile({ displayName: username });
+                
+                // Save user to Firestore
+                await db.collection('users').doc(user.uid).set({
+                    username: username,
+                    email: email,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    uid: user.uid,
+                    role: 'teacher'
+                });
+                
+                sessionStorage.setItem('school_user', JSON.stringify({
+                    uid: user.uid,
+                    username: username,
+                    email: email,
+                    role: 'teacher'
+                }));
+                
+                showToast('Account created successfully! Redirecting...', 'success');
+                
+                setTimeout(() => {
+                    window.location.href = 'dashboard.html';
+                }, 1500);
+                
+            } catch (error) {
+                console.error('Registration error:', error);
+                let errorMessage = 'Registration failed';
+                if (error.code === 'auth/email-already-in-use') {
+                    errorMessage = 'Email already registered. Please sign in.';
+                } else if (error.code === 'auth/invalid-email') {
+                    errorMessage = 'Invalid email address';
+                } else if (error.code === 'auth/weak-password') {
+                    errorMessage = 'Password is too weak';
+                }
+                showToast(errorMessage, 'error');
+                btn.textContent = 'Create Account →';
+                btn.disabled = false;
+            }
+        }
+        
+        // Google Sign Up
+        async function handleGoogleSignUp() {
+            const btn = document.getElementById('googleSignUp');
+            btn.textContent = 'Connecting...';
+            btn.disabled = true;
+            
+            try {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                const result = await auth.signInWithPopup(provider);
+                const user = result.user;
+                
+                // Check if user exists in Firestore
+                const userDoc = await db.collection('users').doc(user.uid).get();
+                if (!userDoc.exists) {
+                    await db.collection('users').doc(user.uid).set({
+                        username: user.displayName || user.email.split('@')[0],
+                        email: user.email,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        uid: user.uid,
+                        role: 'teacher',
+                        photoURL: user.photoURL || ''
+                    });
+                    showToast('Account created with Google!', 'success');
+                } else {
+                    showToast('Welcome back!', 'success');
+                }
+                
+                sessionStorage.setItem('school_user', JSON.stringify({
+                    uid: user.uid,
+                    username: user.displayName || user.email.split('@')[0],
+                    email: user.email,
+                    role: 'teacher'
+                }));
+                
+                setTimeout(() => window.location.href = 'dashboard.html', 1500);
+                
+            } catch (error) {
+                console.error('Google sign up error:', error);
+                showToast('Google sign up failed. Please try again.', 'error');
+            } finally {
+                btn.textContent = 'Sign up with Google';
+                btn.disabled = false;
+            }
+        }
+        
+        // Event listeners
+        document.getElementById('registerForm').addEventListener('submit', handleRegister);
+        document.getElementById('googleSignUp').addEventListener('click', handleGoogleSignUp);
+    </script>
+</body>
+</html>

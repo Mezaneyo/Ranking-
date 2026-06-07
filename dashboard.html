@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Dashboard - School Ranking System</title>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: #f5f5f5; 
+            padding-bottom: 70px;
+        }
+        
+        /* MINIMIZED HEADER */
+        .header { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            padding: 12px 16px; 
+            position: sticky; 
+            top: 0; 
+            z-index: 10;
+        }
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { 
+            font-size: 18px; 
+            margin-bottom: 2px;
+        }
+        .header p { 
+            font-size: 11px; 
+            opacity: 0.9;
+        }
+        .logout-btn { 
+            background: rgba(255,255,255,0.2); 
+            padding: 6px 12px; 
+            border-radius: 20px; 
+            font-size: 11px; 
+            cursor: pointer;
+        }
+        
+        .container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 12px; 
+        }
+        
+        .card { 
+            background: white; 
+            border-radius: 16px; 
+            padding: 16px; 
+            margin-bottom: 12px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08); 
+        }
+        .card-title { 
+            font-size: 16px; 
+            font-weight: 600; 
+            margin-bottom: 12px; 
+            color: #333; 
+            border-left: 4px solid #667eea; 
+            padding-left: 12px; 
+        }
+        
+        .btn { 
+            background: #667eea; 
+            color: white; 
+            border: none; 
+            padding: 10px 16px; 
+            border-radius: 12px; 
+            font-size: 14px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            width: 100%; 
+            margin-top: 8px; 
+        }
+        .btn-danger { background: #e74c3c; }
+        .btn-success { background: #27ae60; }
+        .btn-secondary { background: #95a5a6; }
+        
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); 
+            gap: 10px; 
+            margin-top: 10px; 
+        }
+        .card-item { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            padding: 12px; 
+            border-radius: 12px; 
+            cursor: pointer; 
+        }
+        .item-name { font-size: 14px; font-weight: 600; margin-bottom: 5px; }
+        .item-info { font-size: 11px; opacity: 0.9; }
+        
+        .student-item { 
+            display: flex; 
+            align-items: center; 
+            padding: 10px; 
+            margin: 6px 0; 
+            background: #f8f9fa; 
+            border-radius: 12px; 
+        }
+        .rank-number { 
+            width: 36px; 
+            height: 36px; 
+            background: #667eea; 
+            color: white; 
+            border-radius: 18px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-weight: bold; 
+            margin-right: 10px; 
+            font-size: 14px;
+        }
+        .rank-1 { background: #FFD700; color: #333; }
+        .rank-2 { background: #C0C0C0; color: #333; }
+        .rank-3 { background: #CD7F32; color: white; }
+        
+        .student-details { flex: 1; }
+        .student-name { font-size: 14px; font-weight: 500; color: #333; }
+        .student-score { font-size: 11px; color: #999; margin-top: 2px; }
+        .total-marks { font-weight: bold; color: #27ae60; font-size: 14px; }
+        
+        .input-group { margin-bottom: 12px; }
+        label { display: block; margin-bottom: 6px; font-weight: 500; color: #555; font-size: 13px; }
+        input, textarea { 
+            width: 100%; 
+            padding: 10px; 
+            border: 1px solid #ddd; 
+            border-radius: 10px; 
+            font-size: 14px; 
+            font-family: inherit; 
+        }
+        textarea { min-height: 80px; resize: vertical; }
+        
+        .modal { 
+            display: none; 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            right: 0; 
+            bottom: 0; 
+            background: rgba(0,0,0,0.5); 
+            z-index: 1000; 
+            align-items: center; 
+            justify-content: center; 
+            padding: 20px; 
+        }
+        .modal-content { 
+            background: white; 
+            border-radius: 20px; 
+            padding: 20px; 
+            max-width: 500px; 
+            width: 100%; 
+            max-height: 80vh; 
+            overflow-y: auto; 
+        }
+        
+        .bottom-nav { 
+            position: fixed; 
+            bottom: 0; 
+            left: 0; 
+            right: 0; 
+            background: white; 
+            display: flex; 
+            justify-content: space-around; 
+            padding: 8px 16px 16px; 
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1); 
+            z-index: 100; 
+        }
+        .nav-item { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            gap: 3px; 
+            background: none; 
+            border: none; 
+            font-size: 10px; 
+            color: #999; 
+            cursor: pointer; 
+            padding: 6px; 
+        }
+        .nav-item.active { color: #667eea; }
+        .nav-item span:first-child { font-size: 22px; }
+        
+        .fab { 
+            position: fixed; 
+            bottom: 70px; 
+            right: 16px; 
+            width: 50px; 
+            height: 50px; 
+            border-radius: 25px; 
+            background: #667eea; 
+            color: white; 
+            border: none; 
+            font-size: 24px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2); 
+            cursor: pointer; 
+            z-index: 90; 
+            display: none; 
+        }
+        
+        .empty-state { text-align: center; padding: 30px 20px; color: #999; font-size: 13px; }
+        .breadcrumb { margin-bottom: 12px; padding: 8px 12px; background: #f0f2f5; border-radius: 10px; font-size: 12px; }
+        .breadcrumb span { color: #667eea; cursor: pointer; }
+        .toast { 
+            position: fixed; 
+            bottom: 80px; 
+            left: 20px; 
+            right: 20px; 
+            background: #333; 
+            color: white; 
+            text-align: center; 
+            padding: 10px; 
+            border-radius: 10px; 
+            z-index: 1000; 
+            font-size: 12px;
+            animation: fadeOut 2s ease-out forwards; 
+        }
+        @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+        
+        .marks-student-row {
+            margin-bottom: 16px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 12px;
+        }
+        .marks-student-name {
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .marks-input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .marks-input-group input {
+            flex: 1;
+            margin-bottom: 0;
+        }
+        .marks-input-group button {
+            width: auto;
+            margin-top: 0;
+            padding: 10px 16px;
+        }
+        .btn-small {
+            width: auto;
+            display: inline-block;
+            padding: 6px 12px;
+            font-size: 12px;
+            margin-right: 5px;
+        }
+        .btn-icon {
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px 8px;
+        }
+        .sync-status {
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.2);
+            display: inline-block;
+            margin-left: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-top">
+            <div>
+                <h1>🏆 School Ranking System</h1>
+                <p id="welcomeMessage">Welcome, Teacher!</p>
+            </div>
+            <div class="logout-btn" onclick="logout()">🚪 Logout</div>
+        </div>
+    </div>
+    <div class="container" id="mainContainer"></div>
+    <div class="bottom-nav">
+        <button class="nav-item active" data-page="classes"><span>📚</span><span>Classes</span></button>
+        <button class="nav-item" data-page="ranking"><span>🏆</span><span>Ranking</span></button>
+        <button class="nav-item" data-page="settings"><span>⚙️</span><span>Settings</span></button>
+    </div>
+    <button class="fab" id="fabBtn">+</button>
+    <div class="modal" id="modal"><div class="modal-content" id="modalContent"></div></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAKTBTnSHbZ-aEzIOZZ6ElWpybD93DHXVc",
+            authDomain: "school-7bfaa.firebaseapp.com",
+            projectId: "school-7bfaa",
+            storageBucket: "school-7bfaa.firebasestorage.app",
+            messagingSenderId: "91516216765",
+            appId: "1:91516216765:web:d95271f492a680308d1ed4"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        
+        let currentPage = 'classes';
+        let currentClass = null;
+        let currentUser = null;
+        let selectedSubject = null; // Store selected subject for marks
+
+        // Check authentication
+        auth.onAuthStateChanged((user) => {
+            if (!user) {
+                window.location.href = 'index.html';
+            } else {
+                currentUser = user;
+                document.getElementById('welcomeMessage').innerHTML = `Welcome, ${user.displayName || user.email.split('@')[0]}! 👋`;
+                loadUserData();
+            }
+        });
+
+        async function loadUserData() {
+            try {
+                const docRef = db.collection('schoolData').doc(currentUser.uid);
+                const doc = await docRef.get();
+                if (doc.exists) {
+                    window.userData = doc.data();
+                } else {
+                    window.userData = { classes: {}, settings: {} };
+                }
+            } catch (error) {
+                console.error('Firestore error:', error);
+                // Fallback to localStorage
+                const localData = localStorage.getItem('schoolData_' + currentUser.uid);
+                window.userData = localData ? JSON.parse(localData) : { classes: {}, settings: {} };
+            }
+            render();
+        }
+
+        async function saveUserData(data) {
+            window.userData = data;
+            // Save to localStorage as backup
+            localStorage.setItem('schoolData_' + currentUser.uid, JSON.stringify(data));
+            try {
+                await db.collection('schoolData').doc(currentUser.uid).set(data);
+                showToast('✅ Saved to cloud');
+            } catch (error) {
+                console.error('Save error:', error);
+                showToast('⚠️ Saved locally only');
+            }
+        }
+
+        function loadData() {
+            return window.userData || { classes: {}, settings: {} };
+        }
+
+        function saveData(data) {
+            return saveUserData(data);
+        }
+
+        function showToast(message) {
+            const oldToast = document.querySelector('.toast');
+            if (oldToast) oldToast.remove();
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+        }
+
+        function calculateStudentTotal(classData, studentName) {
+            let total = 0;
+            const subjects = classData.subjects || {};
+            Object.keys(subjects).forEach(subject => {
+                total += subjects[subject]?.marks?.[studentName] || 0;
+            });
+            return total;
+        }
+
+        function getRankedStudents(classData) {
+            const students = classData.students || [];
+            const subjects = classData.subjects || {};
+            
+            const studentsWithTotals = students.map(student => {
+                let total = 0;
+                Object.keys(subjects).forEach(subject => {
+                    total += subjects[subject]?.marks?.[student.name] || 0;
+                });
+                return { ...student, total, subjectScores: {} };
+            });
+            
+            studentsWithTotals.forEach(student => {
+                Object.keys(subjects).forEach(subject => {
+                    student.subjectScores[subject] = subjects[subject]?.marks?.[student.name] || 0;
+                });
+            });
+            
+            studentsWithTotals.sort((a, b) => b.total - a.total);
+            studentsWithTotals.forEach((student, idx) => { student.rank = idx + 1; });
+            return studentsWithTotals;
+        }
+
+        function render() {
+            const container = document.getElementById('mainContainer');
+            const fab = document.getElementById('fabBtn');
+            const data = loadData();
+            
+            if (currentPage === 'classes') {
+                renderClasses(data, container);
+                fab.style.display = 'flex';
+            } else if (currentPage === 'ranking') {
+                renderRanking(data, container);
+                fab.style.display = 'none';
+            } else {
+                renderSettings(data, container);
+                fab.style.display = 'none';
+            }
+        }
+
+        function renderClasses(data, container) {
+            if (currentClass) {
+                renderClassDetails(data, container);
+                return;
+            }
+            
+            const classes = Object.keys(data.classes || {});
+            if (classes.length === 0) {
+                container.innerHTML = `<div class="card"><div class="card-title">Welcome!</div><div class="empty-state">📖 No classes yet<br><br>Tap the + button to create your first class</div><button class="btn" onclick="showCreateClassModal()">+ Create First Class</button></div>`;
+                return;
+            }
+            
+            let html = `<div class="card"><div class="card-title">📋 My Classes</div><div class="grid">`;
+            classes.forEach(className => {
+                const classData = data.classes[className];
+                const students = classData?.students || [];
+                const subjects = Object.keys(classData?.subjects || {});
+                html += `<div class="card-item" onclick="selectClass('${escapeHtml(className).replace(/'/g, "\\'")}')"><div class="item-name">${escapeHtml(className)}</div><div class="item-info">👨‍🎓 ${students.length} students | 📚 ${subjects.length} subjects</div></div>`;
+            });
+            html += `</div></div><div class="card"><button class="btn" onclick="showCreateClassModal()">+ Create New Class</button></div>`;
+            container.innerHTML = html;
+        }
+
+        function renderClassDetails(data, container) {
+            const classData = data.classes[currentClass] || { students: [], subjects: {} };
+            const students = classData.students || [];
+            const subjects = classData.subjects || {};
+            const rankedStudents = getRankedStudents(classData);
+            
+            const breadcrumb = `<div class="breadcrumb">📚 <span onclick="goBackToClasses()">Classes</span> / <span>${escapeHtml(currentClass)}</span></div>`;
+            
+            let html = breadcrumb + `<div class="card"><div class="card-title">👨‍🎓 Students (${students.length})</div>`;
+            
+            if (students.length === 0) {
+                html += `<div class="empty-state">No students yet. Add students to this class!</div>`;
+            } else {
+                html += `<div style="max-height: 250px; overflow-y: auto;">`;
+                students.forEach((student, idx) => {
+                    html += `<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; margin: 4px 0; background: #f8f9fa; border-radius: 8px;"><div><strong>${idx + 1}.</strong> ${escapeHtml(student.name)}<br><small>ID: ${student.id || 'N/A'}</small></div><div><button class="btn-icon" onclick="editStudent(${idx})">✏️</button><button class="btn-icon" onclick="deleteStudent(${idx})">🗑️</button></div></div>`;
+                });
+                html += `</div>`;
+            }
+            
+            html += `<div class="input-group" style="margin-top: 10px;"><input type="text" id="newStudentName" placeholder="Student name"></div><div class="input-group"><input type="text" id="newStudentId" placeholder="Student ID (optional)"></div><button class="btn btn-success" onclick="addStudentToClass()">+ Add Student</button><button class="btn btn-secondary" onclick="showBulkAddStudents()">📥 Bulk Add Students</button></div>`;
+            
+            html += `<div class="card"><div class="card-title">📚 Subjects (${Object.keys(subjects).length})</div>`;
+            const subjectNames = Object.keys(subjects);
+            if (subjectNames.length === 0) {
+                html += `<div class="empty-state">No subjects yet. Add subjects to this class!</div>`;
+            } else {
+                html += `<div class="grid">`;
+                subjectNames.forEach(subject => {
+                    const marksCount = Object.keys(subjects[subject]?.marks || {}).length;
+                    html += `<div class="card-item" onclick="openMarksModal('${escapeHtml(subject).replace(/'/g, "\\'")}')"><div class="item-name">📘 ${escapeHtml(subject)}</div><div class="item-info">📝 ${marksCount}/${students.length} have marks</div></div>`;
+                });
+                html += `</div>`;
+            }
+            html += `<button class="btn" onclick="showCreateSubjectModal()">+ Add New Subject</button></div>`;
+            
+            if (rankedStudents.length > 0 && subjectNames.length > 0) {
+                html += `<div class="card"><div class="card-title">🏆 Current Overall Ranking</div>`;
+                rankedStudents.slice(0, 5).forEach((student, idx) => {
+                    let rankClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : '';
+                    html += `<div class="student-item"><div class="rank-number ${rankClass}">${student.rank}</div><div class="student-details"><div class="student-name">${escapeHtml(student.name)}</div><div class="student-score">Total: ${student.total} marks</div></div></div>`;
+                });
+                html += `<button class="btn btn-secondary" onclick="goToRanking()">View Full Ranking →</button></div>`;
+            }
+            
+            container.innerHTML = html;
+        }
+
+        // FIXED: Open marks modal without recursion
+        function openMarksModal(subject) {
+            selectedSubject = subject;
+            const data = loadData();
+            const students = data.classes[currentClass].students || [];
+            
+            let html = `<h3 style="margin-bottom: 16px;">📝 Enter Marks for ${escapeHtml(subject)}</h3>
+                        <p style="margin-bottom: 12px; color: #666; font-size: 13px;">Class: ${escapeHtml(currentClass)}</p>`;
+            
+            if (students.length === 0) {
+                html += `<div class="empty-state">No students in this class yet.<br>Add students first!</div>`;
+            } else {
+                html += `<div style="max-height: 500px; overflow-y: auto;">`;
+                students.forEach((student, idx) => {
+                    const currentMarks = data.classes[currentClass].subjects[subject]?.marks?.[student.name] || 0;
+                    html += `<div class="marks-student-row">
+                                <div class="marks-student-name">${escapeHtml(student.name)}</div>
+                                <div class="marks-input-group">
+                                    <input type="number" id="marks_${idx}" value="${currentMarks}" min="0" max="100" placeholder="Marks">
+                                    <button class="btn-success" style="width: auto; padding: 10px 16px; margin-top: 0;" onclick="saveMarks('${escapeHtml(student.name).replace(/'/g, "\\'")}', ${idx})">Save</button>
+                                </div>
+                                <div style="font-size: 11px; color: #999; margin-top: 4px;">ID: ${student.id || 'N/A'}</div>
+                            </div>`;
+                });
+                html += `</div>`;
+            }
+            
+            html += `<button class="btn btn-secondary" onclick="closeModal()" style="margin-top: 16px;">Close</button>`;
+            
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('modal').style.display = 'flex';
+        }
+
+        // Save marks for a student
+        async function saveMarks(studentName, idx) {
+            const marks = parseInt(document.getElementById(`marks_${idx}`).value) || 0;
+            const data = loadData();
+            
+            if (!data.classes[currentClass].subjects[selectedSubject]) {
+                data.classes[currentClass].subjects[selectedSubject] = { marks: {} };
+            }
+            if (!data.classes[currentClass].subjects[selectedSubject].marks) {
+                data.classes[currentClass].subjects[selectedSubject].marks = {};
+            }
+            
+            data.classes[currentClass].subjects[selectedSubject].marks[studentName] = marks;
+            await saveData(data);
+            showToast(`Saved ${studentName}: ${marks}`);
+            
+            // Refresh the modal to show updated values
+            openMarksModal(selectedSubject);
+            render();
+        }
+
+        function renderRanking(data, container) {
+            if (!currentClass) {
+                container.innerHTML = `<div class="card"><div class="empty-state">Select a class from Classes tab first</div></div>`;
+                return;
+            }
+            
+            const classData = data.classes[currentClass] || { students: [], subjects: {} };
+            const rankedStudents = getRankedStudents(classData);
+            const subjectNames = Object.keys(classData.subjects || {});
+            
+            const breadcrumb = `<div class="breadcrumb">📚 <span onclick="goBackToClasses()">Classes</span> / <span>${escapeHtml(currentClass)}</span> / Ranking</div>`;
+            
+            if (rankedStudents.length === 0) {
+                container.innerHTML = breadcrumb + `<div class="card"><div class="empty-state">No students yet.</div></div>`;
+                return;
+            }
+            
+            let html = breadcrumb + `<div class="card"><div class="card-title">🏆 ${escapeHtml(currentClass)} - Complete Ranking</div>`;
+            html += `<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 13px;">`;
+            html += `<thead><tr style="background: #f0f2f5;"><th>Rank</th><th>Student</th>`;
+            subjectNames.forEach(subject => { html += `<th>${escapeHtml(subject).substring(0, 8)}</th>`; });
+            html += `<th>Total</th></tr></thead><tbody>`;
+            
+            rankedStudents.forEach((student, idx) => {
+                let rankClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : '';
+                html += `<tr style="${idx < 3 ? 'background: #fff9c4;' : ''}">
+                            <td style="padding: 8px;"><div class="rank-number ${rankClass}" style="width: 28px; height: 28px; font-size: 12px;">${student.rank}</div></td>
+                            <td style="padding: 8px;"><strong>${escapeHtml(student.name)}</strong><br><small>ID: ${student.id || 'N/A'}</small></td>`;
+                subjectNames.forEach(subject => {
+                    html += `<td style="padding: 8px; text-align: center;">${student.subjectScores[subject] || 0}</td>`;
+                });
+                html += `<td style="padding: 8px; text-align: center; font-weight: bold; color: #27ae60;">${student.total}</td></tr>`;
+            });
+            
+            html += `</tbody></table></div>
+                    <button class="btn btn-success" onclick="exportClassRanking()" style="margin-top: 12px;">📤 Export to CSV</button>
+                    <button class="btn btn-secondary" onclick="goBackToClasses()" style="margin-top: 8px;">← Back to Class</button>
+                </div>`;
+            container.innerHTML = html;
+        }
+
+        function renderSettings(data, container) {
+            container.innerHTML = `<div class="card"><div class="card-title">👨‍🏫 Account Info</div>
+                <div style="margin-bottom: 8px;"><strong>Name:</strong> ${currentUser.displayName || 'Not set'}</div>
+                <div style="margin-bottom: 8px;"><strong>Email:</strong> ${currentUser.email}</div>
+                <div><strong>User ID:</strong> ${currentUser.uid.substring(0, 8)}...</div>
+                <button class="btn btn-danger" onclick="logout()" style="margin-top: 16px;">🚪 Sign Out</button>
+                </div>
+                <div class="card"><div class="card-title">ℹ️ About</div>
+                <p style="font-size: 13px;"><strong>School Ranking System v6.0</strong></p>
+                <p style="font-size: 12px; margin-top: 8px;">✓ Firebase Authentication</p>
+                <p style="font-size: 12px;">✓ Cloud sync with Firestore</p>
+                <p style="font-size: 12px;">✓ Automatic total calculation</p>
+                <p style="font-size: 12px;">✓ Works offline, syncs when online</p>
+                </div>`;
+        }
+
+        // CRUD Functions
+        function showCreateClassModal() {
+            document.getElementById('modalContent').innerHTML = `<h3>📚 Create New Class</h3><div class="input-group"><input type="text" id="className" placeholder="e.g., Standard 2" autofocus></div><button class="btn" onclick="createClass()">Create Class</button><button class="btn btn-secondary" onclick="closeModal()">Cancel</button>`;
+            document.getElementById('modal').style.display = 'flex';
+        }
+
+        async function createClass() {
+            const className = document.getElementById('className').value.trim();
+            if (!className) return;
+            const data = loadData();
+            if (!data.classes) data.classes = {};
+            if (data.classes[className]) { alert('Class exists!'); return; }
+            data.classes[className] = { students: [], subjects: {} };
+            await saveData(data);
+            closeModal();
+            render();
+        }
+
+        function selectClass(className) { currentClass = className; render(); }
+        function goBackToClasses() { currentClass = null; render(); }
+        function goToRanking() { currentPage = 'ranking'; document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active')); document.querySelector('[data-page="ranking"]').classList.add('active'); render(); }
+        
+        async function addStudentToClass() {
+            const name = document.getElementById('newStudentName').value.trim();
+            if (!name) return;
+            const id = document.getElementById('newStudentId').value;
+            const data = loadData();
+            if (!data.classes[currentClass].students) data.classes[currentClass].students = [];
+            data.classes[currentClass].students.push({ name, id, dateAdded: new Date().toISOString() });
+            await saveData(data);
+            document.getElementById('newStudentName').value = '';
+            document.getElementById('newStudentId').value = '';
+            render();
+        }
+
+        function showCreateSubjectModal() {
+            document.getElementById('modalContent').innerHTML = `<h3>📖 Create Subject for ${escapeHtml(currentClass)}</h3><div class="input-group"><input type="text" id="subjectName" placeholder="e.g., Mathematics, Science, English"></div><button class="btn" onclick="createSubject()">Create Subject</button><button class="btn btn-secondary" onclick="closeModal()">Cancel</button>`;
+            document.getElementById('modal').style.display = 'flex';
+        }
+
+        async function createSubject() {
+            const subjectName = document.getElementById('subjectName').value.trim();
+            if (!subjectName) return;
+            const data = loadData();
+            if (!data.classes[currentClass].subjects) data.classes[currentClass].subjects = {};
+            if (data.classes[currentClass].subjects[subjectName]) { alert('Subject exists!'); return; }
+            data.classes[currentClass].subjects[subjectName] = { marks: {} };
+            await saveData(data);
+            closeModal();
+            render();
+        }
+
+        function showBulkAddStudents() {
+            document.getElementById('modalContent').innerHTML = `<h3>📥 Bulk Add Students</h3><p style="font-size: 12px; color: #666; margin-bottom: 12px;">Enter one name per line or comma-separated</p><textarea id="bulkNames" rows="6" placeholder="Juan Dela Cruz&#10;Maria Santos&#10;Jose Rizal"></textarea><button class="btn btn-success" onclick="processBulkAdd()">Add Students</button><button class="btn btn-secondary" onclick="closeModal()">Cancel</button>`;
+            document.getElementById('modal').style.display = 'flex';
+        }
+
+        async function processBulkAdd() {
+            const text = document.getElementById('bulkNames').value;
+            let names = text.split(/\r?\n/).filter(line => line.trim());
+            if (names.length === 1 && names[0].includes(',')) names = names[0].split(',').map(n => n.trim());
+            const data = loadData();
+            if (!data.classes[currentClass].students) data.classes[currentClass].students = [];
+            names.forEach(name => { if (name.trim()) data.classes[currentClass].students.push({ name: name.trim(), id: '', dateAdded: new Date().toISOString() }); });
+            await saveData(data);
+            closeModal();
+            render();
+        }
+
+        async function editStudent(index) {
+            const data = loadData();
+            const student = data.classes[currentClass].students[index];
+            document.getElementById('modalContent').innerHTML = `<h3>✏️ Edit Student</h3><div class="input-group"><input type="text" id="editName" value="${escapeHtml(student.name)}"></div><div class="input-group"><input type="text" id="editId" value="${student.id || ''}"></div><button class="btn" onclick="updateStudent(${index})">Update</button><button class="btn btn-secondary" onclick="closeModal()">Cancel</button>`;
+            document.getElementById('modal').style.display = 'flex';
+        }
+
+        async function updateStudent(index) {
+            const name = document.getElementById('editName').value.trim();
+            if (!name) return;
+            const id = document.getElementById('editId').value;
+            const data = loadData();
+            data.classes[currentClass].students[index] = { ...data.classes[currentClass].students[index], name, id };
+            await saveData(data);
+            closeModal();
+            render();
+        }
+
+        async function deleteStudent(index) {
+            if (!confirm('Delete this student?')) return;
+            const data = loadData();
+            data.classes[currentClass].students.splice(index, 1);
+            await saveData(data);
+            render();
+        }
+
+        async function exportClassRanking() {
+            const data = loadData();
+            const classData = data.classes[currentClass];
+            const rankedStudents = getRankedStudents(classData);
+            const subjects = Object.keys(classData.subjects || {});
+            let csv = `"${currentClass} Ranking\n",`;
+            csv += "Rank,Student Name,ID," + subjects.join(",") + ",Total\n";
+            rankedStudents.forEach((s, i) => { csv += `${i+1},"${s.name}","${s.id || ''}",` + subjects.map(sub => s.subjectScores[sub] || 0).join(",") + `,${s.total}\n`; });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `${currentClass}_ranking.csv`;
+            a.click();
+            URL.revokeObjectURL(blob);
+            showToast('Exported!');
+        }
+
+        function closeModal() { document.getElementById('modal').style.display = 'none'; }
+        function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+
+        async function logout() {
+            await auth.signOut();
+            sessionStorage.removeItem('school_user');
+            window.location.href = 'index.html';
+        }
+
+        // Make functions global
+        window.showCreateClassModal = showCreateClassModal;
+        window.createClass = createClass;
+        window.selectClass = selectClass;
+        window.addStudentToClass = addStudentToClass;
+        window.showCreateSubjectModal = showCreateSubjectModal;
+        window.createSubject = createSubject;
+        window.goBackToClasses = goBackToClasses;
+        window.goToRanking = goToRanking;
+        window.closeModal = closeModal;
+        window.logout = logout;
+        window.showBulkAddStudents = showBulkAddStudents;
+        window.processBulkAdd = processBulkAdd;
+        window.editStudent = editStudent;
+        window.updateStudent = updateStudent;
+        window.deleteStudent = deleteStudent;
+        window.exportClassRanking = exportClassRanking;
+        window.openMarksModal = openMarksModal;
+        window.saveMarks = saveMarks;
+
+        // Navigation
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                currentPage = item.getAttribute('data-page');
+                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                item.classList.add('active');
+                render();
+            });
+        });
+        
+        document.getElementById('fabBtn').addEventListener('click', () => {
+            if (currentPage === 'classes') {
+                if (currentClass) showCreateSubjectModal();
+                else showCreateClassModal();
+            }
+        });
+        
+        document.getElementById('modal').addEventListener('click', (e) => { if (e.target === document.getElementById('modal')) closeModal(); });
+        
+        render();
+    </script>
+</body>
+</html>
