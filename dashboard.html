@@ -7,6 +7,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <!-- html2pdf library for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -15,7 +17,6 @@
             padding-bottom: 70px;
         }
         
-        /* MINIMIZED HEADER */
         .header { 
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
             color: white; 
@@ -82,6 +83,8 @@
         .btn-danger { background: #e74c3c; }
         .btn-success { background: #27ae60; }
         .btn-secondary { background: #95a5a6; }
+        .btn-warning { background: #f39c12; }
+        .btn-pdf { background: #dc3545; }
         
         .grid { 
             display: grid; 
@@ -252,6 +255,46 @@
             margin-top: 0;
             padding: 10px 16px;
         }
+        
+        .batch-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+            margin-bottom: 16px;
+        }
+        .batch-actions button {
+            flex: 1;
+            margin-top: 0;
+        }
+        .marks-table-container {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .marks-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .marks-table th {
+            background: #f0f2f5;
+            padding: 10px;
+            text-align: left;
+            font-size: 13px;
+            position: sticky;
+            top: 0;
+        }
+        .marks-table td {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .marks-table input {
+            width: 80px;
+            padding: 8px;
+            text-align: center;
+        }
+        .marks-table input.error-input {
+            border-color: #e74c3c;
+            background: #fee;
+        }
         .btn-small {
             width: auto;
             display: inline-block;
@@ -266,13 +309,48 @@
             cursor: pointer;
             padding: 4px 8px;
         }
-        .sync-status {
-            font-size: 9px;
-            padding: 2px 6px;
-            border-radius: 10px;
-            background: rgba(255,255,255,0.2);
-            display: inline-block;
-            margin-left: 6px;
+
+        /* PDF Export Styles */
+        #pdfContent {
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .pdf-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .pdf-header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        .pdf-header p {
+            color: #666;
+            font-size: 12px;
+        }
+        .pdf-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .pdf-table th, .pdf-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+            font-size: 12px;
+        }
+        .pdf-table th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+        .pdf-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        .pdf-footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 10px;
+            color: #999;
         }
     </style>
 </head>
@@ -295,6 +373,9 @@
     <button class="fab" id="fabBtn">+</button>
     <div class="modal" id="modal"><div class="modal-content" id="modalContent"></div></div>
 
+    <!-- Hidden div for PDF generation -->
+    <div id="pdfContent" style="display: none;"></div>
+
     <script>
         const firebaseConfig = {
             apiKey: "AIzaSyAKTBTnSHbZ-aEzIOZZ6ElWpybD93DHXVc",
@@ -312,9 +393,8 @@
         let currentPage = 'classes';
         let currentClass = null;
         let currentUser = null;
-        let selectedSubject = null; // Store selected subject for marks
+        let selectedSubject = null;
 
-        // Check authentication
         auth.onAuthStateChanged((user) => {
             if (!user) {
                 window.location.href = 'index.html';
@@ -336,7 +416,6 @@
                 }
             } catch (error) {
                 console.error('Firestore error:', error);
-                // Fallback to localStorage
                 const localData = localStorage.getItem('schoolData_' + currentUser.uid);
                 window.userData = localData ? JSON.parse(localData) : { classes: {}, settings: {} };
             }
@@ -345,7 +424,6 @@
 
         async function saveUserData(data) {
             window.userData = data;
-            // Save to localStorage as backup
             localStorage.setItem('schoolData_' + currentUser.uid, JSON.stringify(data));
             try {
                 await db.collection('schoolData').doc(currentUser.uid).set(data);
@@ -374,13 +452,11 @@
             setTimeout(() => toast.remove(), 2000);
         }
 
-        function calculateStudentTotal(classData, studentName) {
-            let total = 0;
-            const subjects = classData.subjects || {};
-            Object.keys(subjects).forEach(subject => {
-                total += subjects[subject]?.marks?.[studentName] || 0;
-            });
-            return total;
+        function validateMarks(marks) {
+            let value = parseInt(marks) || 0;
+            if (value > 100) value = 100;
+            if (value < 0) value = 0;
+            return value;
         }
 
         function getRankedStudents(classData) {
@@ -494,43 +570,83 @@
             container.innerHTML = html;
         }
 
-        // FIXED: Open marks modal without recursion
+        // BATCH SAVE MARKS MODAL with validation
         function openMarksModal(subject) {
             selectedSubject = subject;
             const data = loadData();
             const students = data.classes[currentClass].students || [];
             
-            let html = `<h3 style="margin-bottom: 16px;">📝 Enter Marks for ${escapeHtml(subject)}</h3>
-                        <p style="margin-bottom: 12px; color: #666; font-size: 13px;">Class: ${escapeHtml(currentClass)}</p>`;
+            let html = `<h3 style="margin-bottom: 12px;">📝 Enter Marks for ${escapeHtml(subject)}</h3>
+                        <p style="margin-bottom: 16px; color: #666; font-size: 13px;">Class: ${escapeHtml(currentClass)} | Max marks per subject: 100</p>`;
             
             if (students.length === 0) {
                 html += `<div class="empty-state">No students in this class yet.<br>Add students first!</div>`;
             } else {
-                html += `<div style="max-height: 500px; overflow-y: auto;">`;
+                html += `<div class="marks-table-container">
+                            <table class="marks-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Student Name</th>
+                                        <th>ID</th>
+                                        <th>Marks (0-100)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+                
                 students.forEach((student, idx) => {
                     const currentMarks = data.classes[currentClass].subjects[subject]?.marks?.[student.name] || 0;
-                    html += `<div class="marks-student-row">
-                                <div class="marks-student-name">${escapeHtml(student.name)}</div>
-                                <div class="marks-input-group">
-                                    <input type="number" id="marks_${idx}" value="${currentMarks}" min="0" max="100" placeholder="Marks">
-                                    <button class="btn-success" style="width: auto; padding: 10px 16px; margin-top: 0;" onclick="saveMarks('${escapeHtml(student.name).replace(/'/g, "\\'")}', ${idx})">Save</button>
-                                </div>
-                                <div style="font-size: 11px; color: #999; margin-top: 4px;">ID: ${student.id || 'N/A'}</div>
-                            </div>`;
+                    html += `<tr>
+                                <td>${idx + 1}</td>
+                                <td><strong>${escapeHtml(student.name)}</strong></td>
+                                <td>${student.id || 'N/A'}</td>
+                                <td><input type="number" id="marks_${idx}" value="${currentMarks}" min="0" max="100" step="1" onchange="validateSingleMark(${idx})" style="width: 80px; padding: 8px; text-align: center;"></td>
+                             </tr>`;
                 });
-                html += `</div>`;
+                
+                html += `</tbody>
+                            </table>
+                        </div>
+                        <div class="batch-actions">
+                            <button class="btn-warning" onclick="fillAllMarks(100)">⭐ Fill All 100</button>
+                            <button class="btn-warning" onclick="fillAllMarks(0)">📝 Fill All 0</button>
+                        </div>
+                        <button class="btn btn-success" onclick="saveAllMarks()">💾 Save All Marks</button>`;
             }
             
-            html += `<button class="btn btn-secondary" onclick="closeModal()" style="margin-top: 16px;">Close</button>`;
+            html += `<button class="btn btn-secondary" onclick="closeModal()" style="margin-top: 12px;">Close</button>`;
             
             document.getElementById('modalContent').innerHTML = html;
             document.getElementById('modal').style.display = 'flex';
         }
 
-        // Save marks for a student
-        async function saveMarks(studentName, idx) {
-            const marks = parseInt(document.getElementById(`marks_${idx}`).value) || 0;
+        function validateSingleMark(idx) {
+            const input = document.getElementById(`marks_${idx}`);
+            if (input) {
+                let value = parseInt(input.value) || 0;
+                if (value > 100) {
+                    input.value = 100;
+                    showToast('Marks cannot exceed 100! Set to 100');
+                } else if (value < 0) {
+                    input.value = 0;
+                    showToast('Marks cannot be negative! Set to 0');
+                }
+            }
+        }
+
+        function fillAllMarks(value) {
             const data = loadData();
+            const students = data.classes[currentClass].students || [];
+            for (let i = 0; i < students.length; i++) {
+                const input = document.getElementById(`marks_${i}`);
+                if (input) input.value = value;
+            }
+            showToast(`All marks set to ${value}`);
+        }
+
+        async function saveAllMarks() {
+            const data = loadData();
+            const students = data.classes[currentClass].students || [];
             
             if (!data.classes[currentClass].subjects[selectedSubject]) {
                 data.classes[currentClass].subjects[selectedSubject] = { marks: {} };
@@ -539,13 +655,134 @@
                 data.classes[currentClass].subjects[selectedSubject].marks = {};
             }
             
-            data.classes[currentClass].subjects[selectedSubject].marks[studentName] = marks;
-            await saveData(data);
-            showToast(`Saved ${studentName}: ${marks}`);
+            let savedCount = 0;
+            let hasError = false;
             
-            // Refresh the modal to show updated values
-            openMarksModal(selectedSubject);
+            for (let i = 0; i < students.length; i++) {
+                const input = document.getElementById(`marks_${i}`);
+                if (input) {
+                    let marks = parseInt(input.value) || 0;
+                    if (marks > 100) {
+                        marks = 100;
+                        hasError = true;
+                    }
+                    if (marks < 0) marks = 0;
+                    const studentName = students[i].name;
+                    data.classes[currentClass].subjects[selectedSubject].marks[studentName] = marks;
+                    savedCount++;
+                }
+            }
+            
+            await saveData(data);
+            if (hasError) showToast(`⚠️ Some marks were adjusted to 100 max`);
+            showToast(`✅ Saved ${savedCount} student marks for ${selectedSubject}`);
+            closeModal();
             render();
+        }
+
+        // PDF Export Function
+        async function exportToPDF() {
+            const data = loadData();
+            const classData = data.classes[currentClass];
+            
+            if (!classData || !classData.students || classData.students.length === 0) {
+                showToast('No data to export');
+                return;
+            }
+            
+            const students = classData.students || [];
+            const subjects = Object.keys(classData.subjects || {});
+            const rankedStudents = getRankedStudents(classData);
+            
+            // Create PDF content
+            const pdfDiv = document.getElementById('pdfContent');
+            const date = new Date().toLocaleDateString();
+            const schoolName = data.settings?.schoolName || 'School Ranking System';
+            const teacherName = data.settings?.teacherName || currentUser.displayName || 'Teacher';
+            
+            let html = `
+                <div class="pdf-header">
+                    <h1>${escapeHtml(schoolName)}</h1>
+                    <p>Student Performance Report</p>
+                    <p><strong>Class:</strong> ${escapeHtml(currentClass)} | <strong>Teacher:</strong> ${escapeHtml(teacherName)}</p>
+                    <p><strong>Date:</strong> ${date}</p>
+                </div>
+                
+                <table class="pdf-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Student Name</th>
+                            <th>ID</th>`;
+            
+            subjects.forEach(subject => {
+                html += `<th>${escapeHtml(subject)}<br>(Max 100)</th>`;
+            });
+            
+            html += `<th>Total<br>Marks</th>
+                            <th>Average</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+            
+            rankedStudents.forEach((student, idx) => {
+                const totalSubjects = subjects.length;
+                const average = totalSubjects > 0 ? (student.total / totalSubjects).toFixed(1) : 0;
+                html += `<tr>
+                            <td><strong>${student.rank}${getRankSuffix(student.rank)}</strong></td>
+                            <td><strong>${escapeHtml(student.name)}</strong></td>
+                            <td>${student.id || 'N/A'}</td>`;
+                
+                subjects.forEach(subject => {
+                    const marks = student.subjectScores[subject] || 0;
+                    let marksClass = '';
+                    if (marks >= 90) marksClass = 'style="color: #27ae60; font-weight: bold;"';
+                    else if (marks >= 75) marksClass = 'style="color: #3498db;"';
+                    else if (marks >= 50) marksClass = 'style="color: #f39c12;"';
+                    else marksClass = 'style="color: #e74c3c;"';
+                    html += `<td ${marksClass}>${marks}</td>`;
+                });
+                
+                html += `<td><strong>${student.total}</strong></td>
+                            <td>${average}%</td>
+                         </tr>`;
+            });
+            
+            html += `</tbody>
+                 </table>
+                 
+                 <div class="pdf-footer">
+                     <p>Generated by School Ranking System | Subject marks are out of 100 maximum</p>
+                     <p>${students.length} students | ${subjects.length} subjects</p>
+                 </div>`;
+            
+            pdfDiv.innerHTML = html;
+            pdfDiv.style.display = 'block';
+            
+            try {
+                const element = document.getElementById('pdfContent');
+                const opt = {
+                    margin: [0.5, 0.5, 0.5, 0.5],
+                    filename: `${currentClass}_Performance_Report_${date}.pdf`,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
+                };
+                await html2pdf().set(opt).from(element).save();
+                showToast('PDF exported successfully!');
+            } catch (error) {
+                console.error('PDF error:', error);
+                showToast('Error generating PDF');
+            } finally {
+                pdfDiv.style.display = 'none';
+            }
+        }
+        
+        function getRankSuffix(rank) {
+            if (rank === 1) return 'st';
+            if (rank === 2) return 'nd';
+            if (rank === 3) return 'rd';
+            return 'th';
         }
 
         function renderRanking(data, container) {
@@ -569,21 +806,27 @@
             html += `<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 13px;">`;
             html += `<thead><tr style="background: #f0f2f5;"><th>Rank</th><th>Student</th>`;
             subjectNames.forEach(subject => { html += `<th>${escapeHtml(subject).substring(0, 8)}</th>`; });
-            html += `<th>Total</th></tr></thead><tbody>`;
+            html += `<th>Total</th><th>Avg%</th></tr></thead><tbody>`;
             
             rankedStudents.forEach((student, idx) => {
                 let rankClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : '';
+                const average = subjectNames.length > 0 ? (student.total / subjectNames.length).toFixed(1) : 0;
                 html += `<tr style="${idx < 3 ? 'background: #fff9c4;' : ''}">
                             <td style="padding: 8px;"><div class="rank-number ${rankClass}" style="width: 28px; height: 28px; font-size: 12px;">${student.rank}</div></td>
                             <td style="padding: 8px;"><strong>${escapeHtml(student.name)}</strong><br><small>ID: ${student.id || 'N/A'}</small></td>`;
                 subjectNames.forEach(subject => {
                     html += `<td style="padding: 8px; text-align: center;">${student.subjectScores[subject] || 0}</td>`;
                 });
-                html += `<td style="padding: 8px; text-align: center; font-weight: bold; color: #27ae60;">${student.total}</td></tr>`;
+                html += `<td style="padding: 8px; text-align: center; font-weight: bold; color: #27ae60;">${student.total}</td>
+                         <td style="padding: 8px; text-align: center;">${average}%</td>
+                         </tr>`;
             });
             
             html += `</tbody></table></div>
-                    <button class="btn btn-success" onclick="exportClassRanking()" style="margin-top: 12px;">📤 Export to CSV</button>
+                    <div class="batch-actions" style="margin-top: 12px;">
+                        <button class="btn btn-success" onclick="exportClassRanking()">📊 Export CSV</button>
+                        <button class="btn btn-pdf" onclick="exportToPDF()">📄 Export PDF</button>
+                    </div>
                     <button class="btn btn-secondary" onclick="goBackToClasses()" style="margin-top: 8px;">← Back to Class</button>
                 </div>`;
             container.innerHTML = html;
@@ -596,13 +839,31 @@
                 <div><strong>User ID:</strong> ${currentUser.uid.substring(0, 8)}...</div>
                 <button class="btn btn-danger" onclick="logout()" style="margin-top: 16px;">🚪 Sign Out</button>
                 </div>
+                <div class="card"><div class="card-title">🏫 School Info</div>
+                    <div class="input-group"><label>School Name</label><input type="text" id="schoolName" value="${escapeHtml(data.settings?.schoolName || '')}" placeholder="Your School Name"></div>
+                    <button class="btn" onclick="saveSchoolInfo()">Save School Info</button>
+                </div>
                 <div class="card"><div class="card-title">ℹ️ About</div>
-                <p style="font-size: 13px;"><strong>School Ranking System v6.0</strong></p>
-                <p style="font-size: 12px; margin-top: 8px;">✓ Firebase Authentication</p>
-                <p style="font-size: 12px;">✓ Cloud sync with Firestore</p>
-                <p style="font-size: 12px;">✓ Automatic total calculation</p>
-                <p style="font-size: 12px;">✓ Works offline, syncs when online</p>
+                <p style="font-size: 13px;"><strong>School Ranking System v7.0</strong></p>
+                <p style="font-size: 12px; margin-top: 8px;">✓ Batch mark entry - Save all at once</p>
+                <p style="font-size: 12px;">✓ Marks capped at 100 per subject</p>
+                <p style="font-size: 12px;">✓ Export to PDF with table format</p>
+                <p style="font-size: 12px;">✓ Export to CSV for Excel</p>
+                <p style="font-size: 12px;">✓ Automatic total & average calculation</p>
                 </div>`;
+                
+            // Pre-fill school name
+            const schoolInput = document.getElementById('schoolName');
+            if (schoolInput) schoolInput.value = data.settings?.schoolName || '';
+        }
+
+        async function saveSchoolInfo() {
+            const schoolName = document.getElementById('schoolName').value;
+            const data = loadData();
+            if (!data.settings) data.settings = {};
+            data.settings.schoolName = schoolName;
+            await saveData(data);
+            showToast('School info saved');
         }
 
         // CRUD Functions
@@ -693,11 +954,21 @@
         }
 
         async function deleteStudent(index) {
-            if (!confirm('Delete this student?')) return;
+            if (!confirm('Delete this student? This will remove all their marks.')) return;
             const data = loadData();
+            const studentName = data.classes[currentClass].students[index].name;
             data.classes[currentClass].students.splice(index, 1);
+            
+            const subjects = data.classes[currentClass].subjects || {};
+            Object.keys(subjects).forEach(subject => {
+                if (subjects[subject].marks && subjects[subject].marks[studentName]) {
+                    delete subjects[subject].marks[studentName];
+                }
+            });
+            
             await saveData(data);
             render();
+            showToast('Student deleted');
         }
 
         async function exportClassRanking() {
@@ -706,15 +977,18 @@
             const rankedStudents = getRankedStudents(classData);
             const subjects = Object.keys(classData.subjects || {});
             let csv = `"${currentClass} Ranking\n",`;
-            csv += "Rank,Student Name,ID," + subjects.join(",") + ",Total\n";
-            rankedStudents.forEach((s, i) => { csv += `${i+1},"${s.name}","${s.id || ''}",` + subjects.map(sub => s.subjectScores[sub] || 0).join(",") + `,${s.total}\n`; });
+            csv += "Rank,Student Name,ID," + subjects.join(",") + ",Total,Average%\n";
+            rankedStudents.forEach((s, i) => { 
+                const avg = subjects.length > 0 ? (s.total / subjects.length).toFixed(1) : 0;
+                csv += `${i+1},"${s.name}","${s.id || ''}",` + subjects.map(sub => s.subjectScores[sub] || 0).join(",") + `,${s.total},${avg}\n`; 
+            });
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
             a.download = `${currentClass}_ranking.csv`;
             a.click();
             URL.revokeObjectURL(blob);
-            showToast('Exported!');
+            showToast('Exported to CSV!');
         }
 
         function closeModal() { document.getElementById('modal').style.display = 'none'; }
@@ -722,7 +996,6 @@
 
         async function logout() {
             await auth.signOut();
-            sessionStorage.removeItem('school_user');
             window.location.href = 'index.html';
         }
 
@@ -743,8 +1016,12 @@
         window.updateStudent = updateStudent;
         window.deleteStudent = deleteStudent;
         window.exportClassRanking = exportClassRanking;
+        window.exportToPDF = exportToPDF;
         window.openMarksModal = openMarksModal;
-        window.saveMarks = saveMarks;
+        window.saveAllMarks = saveAllMarks;
+        window.fillAllMarks = fillAllMarks;
+        window.validateSingleMark = validateSingleMark;
+        window.saveSchoolInfo = saveSchoolInfo;
 
         // Navigation
         document.querySelectorAll('.nav-item').forEach(item => {
