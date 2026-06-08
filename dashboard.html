@@ -7,8 +7,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <!-- html2pdf library for PDF export -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- html2pdf library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -230,42 +230,6 @@
         }
         @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
         
-        .marks-student-row {
-            margin-bottom: 16px;
-            padding: 12px;
-            background: #f8f9fa;
-            border-radius: 12px;
-        }
-        .marks-student-name {
-            font-weight: 600;
-            margin-bottom: 8px;
-            font-size: 14px;
-        }
-        .marks-input-group {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        .marks-input-group input {
-            flex: 1;
-            margin-bottom: 0;
-        }
-        .marks-input-group button {
-            width: auto;
-            margin-top: 0;
-            padding: 10px 16px;
-        }
-        
-        .batch-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 16px;
-            margin-bottom: 16px;
-        }
-        .batch-actions button {
-            flex: 1;
-            margin-top: 0;
-        }
         .marks-table-container {
             max-height: 500px;
             overflow-y: auto;
@@ -291,16 +255,15 @@
             padding: 8px;
             text-align: center;
         }
-        .marks-table input.error-input {
-            border-color: #e74c3c;
-            background: #fee;
+        .batch-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+            margin-bottom: 16px;
         }
-        .btn-small {
-            width: auto;
-            display: inline-block;
-            padding: 6px 12px;
-            font-size: 12px;
-            margin-right: 5px;
+        .batch-actions button {
+            flex: 1;
+            margin-top: 0;
         }
         .btn-icon {
             background: none;
@@ -311,37 +274,44 @@
         }
 
         /* PDF Export Styles */
-        #pdfContent {
-            padding: 20px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        .pdf-container {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            background: white;
         }
         .pdf-header {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 20px;
         }
         .pdf-header h1 {
-            font-size: 24px;
-            margin-bottom: 5px;
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 10px;
         }
         .pdf-header p {
             color: #666;
-            font-size: 12px;
+            font-size: 14px;
+            margin: 5px 0;
         }
         .pdf-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
+            margin: 20px 0;
+            font-size: 12px;
         }
         .pdf-table th, .pdf-table td {
             border: 1px solid #ddd;
-            padding: 10px;
+            padding: 10px 8px;
             text-align: center;
-            font-size: 12px;
         }
         .pdf-table th {
             background: #667eea;
             color: white;
-            font-weight: 600;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
         }
         .pdf-table tr:nth-child(even) {
             background: #f8f9fa;
@@ -349,8 +319,17 @@
         .pdf-footer {
             margin-top: 30px;
             text-align: center;
-            font-size: 10px;
+            font-size: 11px;
             color: #999;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+        }
+        .csc-title {
+            background: #667eea;
+            color: white;
+            padding: 8px;
+            text-align: center;
+            margin-top: 30px;
         }
     </style>
 </head>
@@ -372,9 +351,6 @@
     </div>
     <button class="fab" id="fabBtn">+</button>
     <div class="modal" id="modal"><div class="modal-content" id="modalContent"></div></div>
-
-    <!-- Hidden div for PDF generation -->
-    <div id="pdfContent" style="display: none;"></div>
 
     <script>
         const firebaseConfig = {
@@ -570,7 +546,7 @@
             container.innerHTML = html;
         }
 
-        // BATCH SAVE MARKS MODAL with validation
+        // BATCH SAVE MARKS MODAL
         function openMarksModal(subject) {
             selectedSubject = subject;
             const data = loadData();
@@ -601,7 +577,7 @@
                                 <td><strong>${escapeHtml(student.name)}</strong></td>
                                 <td>${student.id || 'N/A'}</td>
                                 <td><input type="number" id="marks_${idx}" value="${currentMarks}" min="0" max="100" step="1" onchange="validateSingleMark(${idx})" style="width: 80px; padding: 8px; text-align: center;"></td>
-                             </tr>`;
+                             </table>`;
                 });
                 
                 html += `</tbody>
@@ -656,16 +632,11 @@
             }
             
             let savedCount = 0;
-            let hasError = false;
-            
             for (let i = 0; i < students.length; i++) {
                 const input = document.getElementById(`marks_${i}`);
                 if (input) {
                     let marks = parseInt(input.value) || 0;
-                    if (marks > 100) {
-                        marks = 100;
-                        hasError = true;
-                    }
+                    if (marks > 100) marks = 100;
                     if (marks < 0) marks = 0;
                     const studentName = students[i].name;
                     data.classes[currentClass].subjects[selectedSubject].marks[studentName] = marks;
@@ -674,13 +645,12 @@
             }
             
             await saveData(data);
-            if (hasError) showToast(`⚠️ Some marks were adjusted to 100 max`);
             showToast(`✅ Saved ${savedCount} student marks for ${selectedSubject}`);
             closeModal();
             render();
         }
 
-        // PDF Export Function
+        // PDF Export Function - Fixed Version
         async function exportToPDF() {
             const data = loadData();
             const classData = data.classes[currentClass];
@@ -694,33 +664,43 @@
             const subjects = Object.keys(classData.subjects || {});
             const rankedStudents = getRankedStudents(classData);
             
-            // Create PDF content
-            const pdfDiv = document.getElementById('pdfContent');
             const date = new Date().toLocaleDateString();
             const schoolName = data.settings?.schoolName || 'School Ranking System';
             const teacherName = data.settings?.teacherName || currentUser.displayName || 'Teacher';
             
+            // Create a new div for PDF
+            const pdfDiv = document.createElement('div');
+            pdfDiv.style.position = 'absolute';
+            pdfDiv.style.left = '-9999px';
+            pdfDiv.style.top = '-9999px';
+            pdfDiv.style.width = '1200px';
+            pdfDiv.style.background = 'white';
+            pdfDiv.style.padding = '40px';
+            pdfDiv.style.fontFamily = 'Arial, sans-serif';
+            
+            // Build PDF HTML
             let html = `
-                <div class="pdf-header">
-                    <h1>${escapeHtml(schoolName)}</h1>
-                    <p>Student Performance Report</p>
-                    <p><strong>Class:</strong> ${escapeHtml(currentClass)} | <strong>Teacher:</strong> ${escapeHtml(teacherName)}</p>
-                    <p><strong>Date:</strong> ${date}</p>
+                <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #667eea; padding-bottom: 20px;">
+                    <h1 style="font-size: 28px; color: #333; margin-bottom: 10px;">${escapeHtml(schoolName)}</h1>
+                    <p style="color: #666; font-size: 14px;">Student Performance Report</p>
+                    <p style="color: #666; font-size: 12px; margin-top: 10px;"><strong>Class:</strong> ${escapeHtml(currentClass)} | <strong>Teacher:</strong> ${escapeHtml(teacherName)}</p>
+                    <p style="color: #666; font-size: 12px;"><strong>Date:</strong> ${date}</p>
                 </div>
                 
-                <table class="pdf-table">
+                <h3 style="margin: 20px 0 10px 0;">📊 Student Ranking Table (Students vs Subjects)</h3>
+                <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 12px;">
                     <thead>
-                        <tr>
-                            <th>Rank</th>
-                            <th>Student Name</th>
-                            <th>ID</th>`;
+                        <tr style="background: #667eea; color: white;">
+                            <th style="border: 1px solid #ddd; padding: 10px;">Rank</th>
+                            <th style="border: 1px solid #ddd; padding: 10px;">Student Name</th>
+                            <th style="border: 1px solid #ddd; padding: 10px;">ID</th>`;
             
             subjects.forEach(subject => {
-                html += `<th>${escapeHtml(subject)}<br>(Max 100)</th>`;
+                html += `<th style="border: 1px solid #ddd; padding: 10px;">${escapeHtml(subject)}<br>(Max 100)</th>`;
             });
             
-            html += `<th>Total<br>Marks</th>
-                            <th>Average</th>
+            html += `<th style="border: 1px solid #ddd; padding: 10px;">Total</th>
+                            <th style="border: 1px solid #ddd; padding: 10px;">Average</th>
                         </tr>
                     </thead>
                     <tbody>`;
@@ -728,53 +708,82 @@
             rankedStudents.forEach((student, idx) => {
                 const totalSubjects = subjects.length;
                 const average = totalSubjects > 0 ? (student.total / totalSubjects).toFixed(1) : 0;
-                html += `<tr>
-                            <td><strong>${student.rank}${getRankSuffix(student.rank)}</strong></td>
-                            <td><strong>${escapeHtml(student.name)}</strong></td>
-                            <td>${student.id || 'N/A'}</td>`;
+                const rankSuffix = idx === 0 ? 'st' : idx === 1 ? 'nd' : idx === 2 ? 'rd' : 'th';
+                
+                html += `<tr style="${idx % 2 === 0 ? 'background: #f8f9fa;' : ''}">
+                            <td style="border: 1px solid #ddd; padding: 8px; text-align: center;"><strong>${student.rank}${rankSuffix}</strong></td>
+                            <td style="border: 1px solid #ddd; padding: 8px;"><strong>${escapeHtml(student.name)}</strong></td>
+                            <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${student.id || 'N/A'}</td>`;
                 
                 subjects.forEach(subject => {
                     const marks = student.subjectScores[subject] || 0;
-                    let marksClass = '';
-                    if (marks >= 90) marksClass = 'style="color: #27ae60; font-weight: bold;"';
-                    else if (marks >= 75) marksClass = 'style="color: #3498db;"';
-                    else if (marks >= 50) marksClass = 'style="color: #f39c12;"';
-                    else marksClass = 'style="color: #e74c3c;"';
-                    html += `<td ${marksClass}>${marks}</td>`;
+                    let color = marks >= 90 ? '#27ae60' : (marks >= 75 ? '#3498db' : (marks >= 50 ? '#f39c12' : '#e74c3c'));
+                    html += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center; color: ${color}; font-weight: bold;">${marks}</td>`;
                 });
                 
-                html += `<td><strong>${student.total}</strong></td>
-                            <td>${average}%</td>
+                html += `<td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold;">${student.total}</td>
+                            <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${average}%</td>
                          </tr>`;
             });
             
             html += `</tbody>
-                 </table>
-                 
-                 <div class="pdf-footer">
-                     <p>Generated by School Ranking System | Subject marks are out of 100 maximum</p>
-                     <p>${students.length} students | ${subjects.length} subjects</p>
-                 </div>`;
+                </table>
+                
+                <div style="margin-top: 40px; page-break-before: always;"></div>
+                
+                <h3 style="margin: 20px 0 10px 0;">📋 CSC Form Table (Subjects vs Students)</h3>
+                <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 12px;">
+                    <thead>
+                        <tr style="background: #667eea; color: white;">
+                            <th style="border: 1px solid #ddd; padding: 10px;">Subject</th>`;
+            
+            students.forEach(student => {
+                html += `<th style="border: 1px solid #ddd; padding: 10px;">${escapeHtml(student.name)}</th>`;
+            });
+            
+            html += `</tr>
+                    </thead>
+                    <tbody>`;
+            
+            subjects.forEach(subject => {
+                html += `<tr style="background: #f8f9fa;">
+                            <td style="border: 1px solid #ddd; padding: 10px; font-weight: bold;">${escapeHtml(subject)}</td>`;
+                
+                students.forEach(student => {
+                    const marks = classData.subjects[subject]?.marks?.[student.name] || 0;
+                    let color = marks >= 90 ? '#27ae60' : (marks >= 75 ? '#3498db' : (marks >= 50 ? '#f39c12' : '#e74c3c'));
+                    html += `<td style="border: 1px solid #ddd; padding: 10px; text-align: center; color: ${color}; font-weight: bold;">${marks}</td>`;
+                });
+                
+                html += `</tr>`;
+            });
+            
+            html += `</tbody>
+                </table>
+                
+                <div style="margin-top: 30px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #ddd; padding-top: 20px;">
+                    <p>Generated by School Ranking System | Subject marks are out of 100 maximum</p>
+                    <p>${students.length} students | ${subjects.length} subjects | Total possible marks per student: ${subjects.length * 100}</p>
+                </div>`;
             
             pdfDiv.innerHTML = html;
-            pdfDiv.style.display = 'block';
+            document.body.appendChild(pdfDiv);
             
             try {
-                const element = document.getElementById('pdfContent');
                 const opt = {
                     margin: [0.5, 0.5, 0.5, 0.5],
-                    filename: `${currentClass}_Performance_Report_${date}.pdf`,
+                    filename: `${currentClass}_Performance_Report_${date.replace(/\//g, '-')}.pdf`,
                     image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2, useCORS: true },
+                    html2canvas: { scale: 2, useCORS: true, logging: false },
                     jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
                 };
-                await html2pdf().set(opt).from(element).save();
+                await html2pdf().set(opt).from(pdfDiv).save();
                 showToast('PDF exported successfully!');
             } catch (error) {
                 console.error('PDF error:', error);
-                showToast('Error generating PDF');
+                showToast('Error generating PDF. Please try again.');
             } finally {
-                pdfDiv.style.display = 'none';
+                document.body.removeChild(pdfDiv);
             }
         }
         
@@ -794,6 +803,7 @@
             const classData = data.classes[currentClass] || { students: [], subjects: {} };
             const rankedStudents = getRankedStudents(classData);
             const subjectNames = Object.keys(classData.subjects || {});
+            const students = classData.students || [];
             
             const breadcrumb = `<div class="breadcrumb">📚 <span onclick="goBackToClasses()">Classes</span> / <span>${escapeHtml(currentClass)}</span> / Ranking</div>`;
             
@@ -802,8 +812,9 @@
                 return;
             }
             
-            let html = breadcrumb + `<div class="card"><div class="card-title">🏆 ${escapeHtml(currentClass)} - Complete Ranking</div>`;
-            html += `<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 13px;">`;
+            // Student Ranking Table
+            let html = breadcrumb + `<div class="card"><div class="card-title">🏆 ${escapeHtml(currentClass)} - Student Ranking</div>`;
+            html += `<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 12px;">`;
             html += `<thead><tr style="background: #f0f2f5;"><th>Rank</th><th>Student</th>`;
             subjectNames.forEach(subject => { html += `<th>${escapeHtml(subject).substring(0, 8)}</th>`; });
             html += `<th>Total</th><th>Avg%</th></tr></thead><tbody>`;
@@ -827,9 +838,131 @@
                         <button class="btn btn-success" onclick="exportClassRanking()">📊 Export CSV</button>
                         <button class="btn btn-pdf" onclick="exportToPDF()">📄 Export PDF</button>
                     </div>
-                    <button class="btn btn-secondary" onclick="goBackToClasses()" style="margin-top: 8px;">← Back to Class</button>
-                </div>`;
+                    </div>`;
+            
+            // CSC Form Table (Subjects vs Students)
+            if (subjectNames.length > 0 && students.length > 0) {
+                html += `<div class="card"><div class="card-title">📋 CSC Form - ${escapeHtml(currentClass)} (Subjects vs Students)</div>`;
+                html += `<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: 12px;">`;
+                html += `<thead><tr style="background: #667eea; color: white;"><th style="padding: 8px;">Subject</th>`;
+                
+                students.forEach(student => {
+                    html += `<th style="padding: 8px;">${escapeHtml(student.name).substring(0, 12)}</th>`;
+                });
+                html += `</tr></thead><tbody>`;
+                
+                subjectNames.forEach(subject => {
+                    html += `<tr><td style="padding: 8px; font-weight: bold; background: #f0f2f5;">${escapeHtml(subject)}</td>`;
+                    students.forEach(student => {
+                        const marks = classData.subjects[subject]?.marks?.[student.name] || 0;
+                        let markClass = marks >= 90 ? 'style="color: #27ae60; font-weight: bold;"' : (marks >= 75 ? 'style="color: #3498db;"' : (marks >= 50 ? 'style="color: #f39c12;"' : 'style="color: #e74c3c;"'));
+                        html += `<td style="padding: 8px; text-align: center;" ${markClass}>${marks}</td>`;
+                    });
+                    html += `</tr>`;
+                });
+                
+                html += `</tbody></table></div>
+                        <button class="btn btn-secondary" onclick="exportCSCForm()" style="margin-top: 12px;">📄 Export CSC Form (PDF)</button>
+                        </div>`;
+            }
+            
+            html += `<button class="btn btn-secondary" onclick="goBackToClasses()" style="margin-top: 8px;">← Back to Class</button>`;
             container.innerHTML = html;
+        }
+        
+        // Export CSC Form PDF
+        async function exportCSCForm() {
+            const data = loadData();
+            const classData = data.classes[currentClass];
+            
+            if (!classData || !classData.students || classData.students.length === 0) {
+                showToast('No data to export');
+                return;
+            }
+            
+            const students = classData.students || [];
+            const subjects = Object.keys(classData.subjects || {});
+            const date = new Date().toLocaleDateString();
+            const schoolName = data.settings?.schoolName || 'School Ranking System';
+            
+            const pdfDiv = document.createElement('div');
+            pdfDiv.style.position = 'absolute';
+            pdfDiv.style.left = '-9999px';
+            pdfDiv.style.top = '-9999px';
+            pdfDiv.style.width = '1200px';
+            pdfDiv.style.background = 'white';
+            pdfDiv.style.padding = '40px';
+            pdfDiv.style.fontFamily = 'Arial, sans-serif';
+            
+            let html = `
+                <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #667eea; padding-bottom: 20px;">
+                    <h1 style="font-size: 28px; color: #333; margin-bottom: 10px;">${escapeHtml(schoolName)}</h1>
+                    <p style="color: #666; font-size: 14px;">CSC Form - Class Performance Report</p>
+                    <p style="color: #666; font-size: 12px; margin-top: 10px;"><strong>Class:</strong> ${escapeHtml(currentClass)}</p>
+                    <p style="color: #666; font-size: 12px;"><strong>Date:</strong> ${date}</p>
+                </div>
+                
+                <h3 style="margin: 20px 0 10px 0;">📋 CSC Form (Subjects vs Students)</h3>
+                <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 11px;">
+                    <thead>
+                        <tr style="background: #667eea; color: white;">
+                            <th style="border: 1px solid #ddd; padding: 10px;">Subject</th>`;
+            
+            students.forEach(student => {
+                html += `<th style="border: 1px solid #ddd; padding: 10px;">${escapeHtml(student.name)}<br><span style="font-size: 9px;">ID: ${student.id || 'N/A'}</span></th>`;
+            });
+            
+            html += `<th style="border: 1px solid #ddd; padding: 10px;">Class Avg</th>
+                        <tr>
+                    </thead>
+                    <tbody>`;
+            
+            subjects.forEach(subject => {
+                let totalMarks = 0;
+                let count = 0;
+                html += `<tr>
+                            <td style="border: 1px solid #ddd; padding: 10px; font-weight: bold; background: #f8f9fa;">${escapeHtml(subject)}</td>`;
+                
+                students.forEach(student => {
+                    const marks = classData.subjects[subject]?.marks?.[student.name] || 0;
+                    totalMarks += marks;
+                    count++;
+                    let color = marks >= 90 ? '#27ae60' : (marks >= 75 ? '#3498db' : (marks >= 50 ? '#f39c12' : '#e74c3c'));
+                    html += `<td style="border: 1px solid #ddd; padding: 10px; text-align: center; color: ${color}; font-weight: bold;">${marks}</td>`;
+                });
+                
+                const classAvg = count > 0 ? (totalMarks / count).toFixed(1) : 0;
+                html += `<td style="border: 1px solid #ddd; padding: 10px; text-align: center; background: #e8f5e9; font-weight: bold;">${classAvg}</td>
+                        </tr>`;
+            });
+            
+            html += `</tbody>
+                90
+                
+                <div style="margin-top: 30px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #ddd; padding-top: 20px;">
+                    <p>Generated by School Ranking System | Subject marks are out of 100 maximum</p>
+                    <p>${students.length} students | ${subjects.length} subjects</p>
+                </div>`;
+            
+            pdfDiv.innerHTML = html;
+            document.body.appendChild(pdfDiv);
+            
+            try {
+                const opt = {
+                    margin: [0.5, 0.5, 0.5, 0.5],
+                    filename: `${currentClass}_CSC_Form_${date.replace(/\//g, '-')}.pdf`,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
+                };
+                await html2pdf().set(opt).from(pdfDiv).save();
+                showToast('CSC Form PDF exported successfully!');
+            } catch (error) {
+                console.error('PDF error:', error);
+                showToast('Error generating PDF');
+            } finally {
+                document.body.removeChild(pdfDiv);
+            }
         }
 
         function renderSettings(data, container) {
@@ -841,27 +974,31 @@
                 </div>
                 <div class="card"><div class="card-title">🏫 School Info</div>
                     <div class="input-group"><label>School Name</label><input type="text" id="schoolName" value="${escapeHtml(data.settings?.schoolName || '')}" placeholder="Your School Name"></div>
-                    <button class="btn" onclick="saveSchoolInfo()">Save School Info</button>
+                    <div class="input-group"><label>Teacher Name</label><input type="text" id="teacherName" value="${escapeHtml(data.settings?.teacherName || '')}" placeholder="Your Name"></div>
+                    <button class="btn" onclick="saveSchoolInfo()">Save Info</button>
                 </div>
                 <div class="card"><div class="card-title">ℹ️ About</div>
                 <p style="font-size: 13px;"><strong>School Ranking System v7.0</strong></p>
                 <p style="font-size: 12px; margin-top: 8px;">✓ Batch mark entry - Save all at once</p>
                 <p style="font-size: 12px;">✓ Marks capped at 100 per subject</p>
-                <p style="font-size: 12px;">✓ Export to PDF with table format</p>
+                <p style="font-size: 12px;">✓ Export to PDF with Student Ranking Table</p>
+                <p style="font-size: 12px;">✓ CSC Form Table (Subjects vs Students)</p>
                 <p style="font-size: 12px;">✓ Export to CSV for Excel</p>
-                <p style="font-size: 12px;">✓ Automatic total & average calculation</p>
                 </div>`;
                 
-            // Pre-fill school name
             const schoolInput = document.getElementById('schoolName');
+            const teacherInput = document.getElementById('teacherName');
             if (schoolInput) schoolInput.value = data.settings?.schoolName || '';
+            if (teacherInput) teacherInput.value = data.settings?.teacherName || '';
         }
 
         async function saveSchoolInfo() {
             const schoolName = document.getElementById('schoolName').value;
+            const teacherName = document.getElementById('teacherName').value;
             const data = loadData();
             if (!data.settings) data.settings = {};
             data.settings.schoolName = schoolName;
+            data.settings.teacherName = teacherName;
             await saveData(data);
             showToast('School info saved');
         }
@@ -1017,6 +1154,7 @@
         window.deleteStudent = deleteStudent;
         window.exportClassRanking = exportClassRanking;
         window.exportToPDF = exportToPDF;
+        window.exportCSCForm = exportCSCForm;
         window.openMarksModal = openMarksModal;
         window.saveAllMarks = saveAllMarks;
         window.fillAllMarks = fillAllMarks;
